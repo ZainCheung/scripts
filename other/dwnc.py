@@ -6661,14 +6661,15 @@ class Dwnc:
         is_take = False
         for task_id, task in tasks.items():
             if task_id != '0':
-                need_done = self.task_daily.get(task_id)['times']
-                done_num = task['done']
-                if need_done == done_num and not task['isTake']:
-                    # todo task done
-                    self.random_wait(1, 2, message=f'完成任务{self.task_daily.get(task_id)["name"]}')
-                    self.get('/task/takeDayAward', {'taskid': task_id})
-                else:
-                    is_take = task['isTake']
+                if self.task_daily.get(task_id):
+                    need_done = self.task_daily.get(task_id)['times']
+                    done_num = task['done']
+                    if need_done == done_num and not task['isTake']:
+                        # todo task done
+                        self.random_wait(1, 2, message=f'完成任务{self.task_daily.get(task_id)["name"]}')
+                        self.get('/task/takeDayAward', {'taskid': task_id})
+                    else:
+                        is_take = task['isTake']
 
         total = data['total']
         done = data['done']
@@ -6801,7 +6802,7 @@ class Dwnc:
                 cost = info['cost']
                 self.print(f'解锁{types[str(skip_type)]["name"]}({info["name"]})所需: \t等级{self.level}/{need_level}\t金币:{self.gold}/{cost}({round(self.gold / cost * 100, 2) if cost else 100}%)')
                 if self.gold >= cost and self.level >= need_level:
-                    if skip_type >= 5:
+                    if skip_type >= 5 and self.level < 30:
                         res = self.get('/land/unlock', {'landid': str(skip_type - 4)})
                         pprint(res.json())
                         self.random_wait(1, 2, message=f'解锁{info["name"]}')
@@ -7049,7 +7050,7 @@ class Dwnc:
                 if unlack_goods:
                     sell_good_id = unlack_goods.pop()
                     self.random_wait(1,2, message=f'拍卖上架一个{self.seeds_info[sell_good_id]["name"]}')
-                    self.get('/auction/on', {'auctionid': k, 'goodid': sell_good_id, 'num': 1, 'price': self.seeds_info[sell_good_id]['order_gold'] * 5, 'time': 2})
+                    self.get('/auction/on', {'auctionid': k, 'goodid': sell_good_id, 'num': 1, 'price': self.seeds_info[sell_good_id]['order_gold'] * 3, 'time': 2})
                     data = res.json()
                     pprint(data)
 
@@ -7057,7 +7058,7 @@ class Dwnc:
                 if unlack_goods:
                     sell_good_id = unlack_goods.pop()
                     self.random_wait(1,2, message=f'拍卖上架一个{self.seeds_info[sell_good_id]["name"]}')
-                    self.get('/auction/on', {'auctionid': k, 'goodid': sell_good_id, 'num': 1, 'price': self.seeds_info[sell_good_id]['order_gold'] * 5, 'time': 2})
+                    self.get('/auction/on', {'auctionid': k, 'goodid': sell_good_id, 'num': 1, 'price': self.seeds_info[sell_good_id]['order_gold'] * 3, 'time': 2})
                     data = res.json()
                     pprint(data)
 
@@ -7089,22 +7090,29 @@ if __name__ == '__main__':
                 data[k] = v
         return data
 
+    # accounts = "openid=xxx;sessid=xxx;&openid=xxx;&sessid=xxx;"
     accounts = os.getenv('DWNC_AUTH')
     if not accounts:
         print('请设置环境变量DWNC_AUTH', flush=True)
+
+    # ua 【非必填】
+    # ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.7(0x1800072d) NetType/WIFI Language/zh_CN"
     ua = os.getenv('DWNC_UA')
+
+    # version = "1.1.9"
     version = os.getenv('DWNC_VERSION')
     if ua:
         print(f'DWNC_UA:{ua}', flush=True)
     if version:
+        Dwnc.VERSION = version if version else '1.2.0'
         print(f'DWNC_VERSION:{version}', flush=True)
     accounts = [parse(account) for account in accounts.split('&') if account]
     accounts = [Dwnc(**account, ua=ua) for account in accounts]
 
     print(f'总计{len(accounts)}个账号', flush=True)
     while True:
-        try:
-            for dwnc in accounts:
+        for dwnc in accounts:
+            try:
                 print(f'---------------当前账号: {dwnc.account}------------------')
                 dwnc.login()
                 if last and not dwnc.is_help:
@@ -7137,10 +7145,10 @@ if __name__ == '__main__':
                 last = dwnc
                 dwnc._cache = {}
                 print('-------------------------------------------------\n\n\n\n')
+            except Exception as e:
+                print(e, flush=True)
+        if datetime.datetime.now().hour >= 22:
+            break
 
-            if datetime.datetime.now().hour >= 22:
-                break
-        except Exception as e:
-            print(e, flush=True)
 
         Dwnc.random_wait(200, 900, message='休息一会儿～～～～')
